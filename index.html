@@ -49,7 +49,7 @@ a.card:hover{border-color:var(--bd2);background:var(--cd2)}
 /* título em 3 níveis (como no modelo) */
 .hl{font-family:var(--cond);text-transform:uppercase;line-height:1.12;letter-spacing:-.005em}
 .hl b{display:block;font-weight:600;font-size:clamp(30px,4.2vw,42px);color:var(--tx)}
-.hl span{display:block;font-weight:600;font-size:clamp(22px,3vw,30px);color:#A9ADAC;margin-top:2px}
+.hl>span{display:block;font-weight:600;font-size:clamp(22px,3vw,30px);color:#A9ADAC;margin-top:2px}
 .hl em{display:block;font-style:normal;font-weight:500;font-size:clamp(17px,2.2vw,22px);color:#6F7473;margin-top:2px}
 
 /* hoje */
@@ -173,13 +173,13 @@ function prov(c,n){if(c.subcomponentes){let w=0,p=0;for(const x of c.subcomponen
 function parc(c,n,e){if(c.subcomponentes){const t=c.subcomponentes.reduce((a,x)=>a+x.peso,0);let p=0,o=0;for(const x of c.subcomponentes){const[a,b]=parc(x,n,e*x.peso/t);p+=a;o+=b}return[p,o]}const l=n[c.nome];return l&&l.length?[avg(l)/10*e,0]:[0,e]}
 function info(m){const cfg=S.regras.find(r=>r.materia===m)?.config;if(!cfg)return null;const n={};S.notas.filter(r=>r.materia===m).forEach(r=>(n[r.componente]??=[]).push(Number(r.valor)));
   const root={subcomponentes:cfg.componentes};let md=prov(root,n);if(md!=null&&cfg.arredondar_meio_ponto)md=Math.floor(md*2+.5)/2;
-  const[p,o]=parc(root,n,10),meta=cfg.arredondar_meio_ponto?5.75:6;return{md,cfg,open:o>1e-9,need:o>1e-9?(meta-p)*10/o:null}}
+  const[p,o]=parc(root,n,10),meta=cfg.arredondar_meio_ponto?5.75:6;return{md,br:p,meta,cfg,open:o>1e-9,need:o>1e-9?(meta-p)*10/o:null}}
 const comps=m=>{const c=S.regras.find(r=>r.materia===m)?.config;return c?leaves({subcomponentes:c.componentes}):[]};
 
 /* ---------- foco recomendado ---------- */
 function foco(){const hoje=ymd();return S.materias.map(x=>{const m=x.nome,pv=S.eventos.filter(e=>e.materia===m&&e.tipo==='Prova'&&e.data>=hoje).sort((a,b)=>a.data.localeCompare(b.data))[0],
   d=pv?left(pv.data):null,u=d==null?0:1/(1+d/7),f=info(m),r=f&&f.md!=null?Math.max(0,(6-f.md)/6):0,h=hs(m),df=x.meta_horas?Math.max(0,1-h/x.meta_horas):.3;
-  return{m,d,md:f?.md,h,score:.5*u+.3*r+.2*df}}).sort((a,b)=>b.score-a.score)}
+  return{m,d,md:f?.md,br:f?.br,h,score:.5*u+.3*r+.2*df}}).sort((a,b)=>b.score-a.score)}
 
 /* ---------- escrita ---------- */
 const val=id=>$('#'+id)?.value?.trim()??'';
@@ -237,7 +237,7 @@ function vHoje(){const s=ses(),h0=ymd(),ht=sum(r=>r.data===h0),hw=sum(r=>r.data>
   const strip=`<div class="strip"><div class="row"><span>Hoje <b>${fh(ht)}</b></span><span>Semana <b>${fh(hw)}</b></span>${metaT?`<span>Meta <b>${fh(metaT)}</b></span>`:''}</div>${metaT?bar(hw/metaT*100,'var(--ac)'):''}</div>`;
   const vis=`<div class="card vis"><div class="k">Atividade</div>${chart(()=>true)}<a class="go" href="#materias"><span class="ci">${arrow}</span>Ver matérias</a></div>`;
   const foc=fc.length?`<div class="gr fit">${fc.map(x=>`<a class="card pc" href="#m/${encodeURIComponent(x.m)}"><div class="sp"><h3><span class="dot" style="background:${cor(x.m)}"></span>${esc(x.m)}</h3><span class="go"><span class="ci">${arrow}</span>Abrir</span></div>
-    <div class="lbl" style="margin-top:12px">${[x.d!=null?(x.d===0?'prova hoje':'prova em '+x.d+' d'):'',x.md!=null?'média '+x.md.toFixed(2):'',fh(x.h)+' na semana'].filter(Boolean).join(' · ')}</div>${bar(x.score/mx*100,cor(x.m))}</a>`).join('')}</div>`
+    <div class="lbl" style="margin-top:12px">${[x.d!=null?(x.d===0?'prova hoje':'prova em '+x.d+' d'):'',x.br!=null?'média bruta '+x.br.toFixed(2):'',fh(x.h)+' na semana'].filter(Boolean).join(' · ')}</div>${bar(x.score/mx*100,cor(x.m))}</a>`).join('')}</div>`
     :`<div class="card"><div class="lbl">Nada urgente agora.</div></div>`;
   const prz=`<div class="card">${futuros().slice(0,3).map(evRow).join('')||'<div class="lbl">Nenhum prazo futuro.</div>'}</div>`;
   return `<div class="hg"><div class="card hero"><div class="sp top">${hl}${pill}</div>${ctl}${strip}</div>${vis}</div>${panel('Foco recomendado',foc)}${panel('Próximos prazos',prz)}`}
@@ -245,7 +245,7 @@ function vHoje(){const s=ses(),h0=ymd(),ht=sum(r=>r.data===h0),hw=sum(r=>r.data>
 function vMaterias(){const L=[...S.materias].sort((a,b)=>a.nome.localeCompare(b.nome,'pt'));
   return head('Matérias','Toque para ver tudo de cada uma')+panel('Todas as matérias',`<div class="gr">${L.map(x=>{const f=info(x.nome),p=futuros(x.nome)[0],h=hs(x.nome);
   return `<a class="card pc" href="#m/${encodeURIComponent(x.nome)}"><div class="sp"><h3><span class="dot" style="background:${x.cor}"></span>${esc(x.nome)}</h3><span class="go"><span class="ci">${arrow}</span>Abrir</span></div>
-  <div class="stat" style="margin-top:16px">${f&&f.md!=null?f.md.toFixed(2):'—'}</div><div class="lbl">média provisória</div>${bar(x.meta_horas?h/x.meta_horas*100:0,x.cor)}
+  <div class="stat" style="margin-top:16px">${f?f.br.toFixed(2):'—'}</div><div class="lbl">média bruta</div>${bar(x.meta_horas?h/x.meta_horas*100:0,x.cor)}
   <div class="lbl" style="margin-top:8px">${fh(h)} na semana${p?` · ${esc(p.tipo)} em ${left(p.data)}d`:''}</div></a>`}).join('')}</div>`,`<span class="pill sm">${L.length}</span>`)}
 
 function vMateria(m){const x=mat(m);if(!x)return '<div class="sub">Matéria não encontrada.</div><a href="#materias">← Matérias</a>';
@@ -254,8 +254,8 @@ function vMateria(m){const x=mat(m);if(!x)return '<div class="sub">Matéria não
     b=`<div class="g2"><div class="card"><div class="stat">${fh(hs(m))}</div><div class="lbl">na semana${x.meta_horas?' / '+fh(x.meta_horas):''}</div></div><div class="card"><div class="stat">${fh(tot)}</div><div class="lbl">total</div></div></div>
     <h2>Evolução</h2><div class="card">${chart(r=>r.materia===m)}</div><h2>Registros</h2><div class="card">${rs.map(r=>`<div class="it sp"><span>${dm(r.data)}</span><span><b>${fh(r.horas)}</b> <button class="g d" onclick="del('estudos','${r.id}')">Excluir</button></span></div>`).join('')||'<div class="lbl">Nenhum registro.</div>'}</div>`}
   if(mt==='notas'){const f=info(m),rs=S.notas.filter(r=>r.materia===m).sort((a,z)=>z.data.localeCompare(a.data));
-    const st=!f||f.md==null?'Sem notas':f.md>=6?'Aprovado':f.md>=3?'Recuperação':'Em risco',nd=!f?'Sem regras cadastradas':!f.open?'Todas as notas lançadas':f.need<=0?'Aprovação já garantida':f.need>10?'Aprovação direta inviável':`Precisa de ${f.need.toFixed(2)} no restante`;
-    b=`<div class="card"><div class="sp"><span class="big">${f&&f.md!=null?f.md.toFixed(2):'—'}</span><span class="tag">${st}</span></div><div class="lbl">${nd}</div>${f?.cfg?.descricao?`<div class="lbl" style="margin-top:8px">${esc(f.cfg.descricao)}</div>`:''}</div>
+    const st=!f||f.md==null?'Sem notas':f.open?(f.br>=f.meta?'Passando':'Ainda não passou'):f.md>=6?'Aprovado':f.md>=3?'Recuperação':'Em risco',nd=!f?'Sem regras cadastradas':!f.open?'Todas as notas lançadas':f.need<=0?'Aprovação já garantida':f.need>10?'Aprovação direta inviável':`Precisa de ${f.need.toFixed(2)} no restante`;
+    b=`<div class="card"><div class="sp"><span class="big">${f?f.br.toFixed(2):'—'}</span><span class="tag">${st}</span></div><div class="lbl">média bruta · notas não lançadas valem 0</div><div class="lbl" style="margin-top:6px">${nd}</div>${f&&f.open&&f.md!=null?`<div class="lbl" style="margin-top:6px">Média só das notas lançadas: ${f.md.toFixed(2)}</div>`:''}${f?.cfg?.descricao?`<div class="lbl" style="margin-top:8px">${esc(f.cfg.descricao)}</div>`:''}</div>
     <h2>Lançamentos</h2><div class="card">${rs.map(r=>`<div class="it sp"><span>${esc(r.componente)} <span class="lbl">· ${dm(r.data)}</span></span><span><b>${Number(r.valor).toFixed(1)}</b> <button class="g d" onclick="del('notas','${r.id}')">Excluir</button></span></div>`).join('')||'<div class="lbl">Nenhuma nota.</div>'}</div>
     <h2>Lançar nota</h2><div class="card" style="display:grid;gap:8px"><input type="hidden" id="nm" value="${esc(m)}"><select id="nc">${comps(m).map(k=>`<option>${esc(k)}</option>`).join('')}</select><div class="g2"><input id="nv" inputmode="decimal" placeholder="Nota (0 a 10)"><input id="nd" type="date" value="${ymd()}"></div><button class="p" onclick="addNota('n')">Lançar</button></div>`}
   if(mt==='listas'){const ls=S.listas.filter(r=>r.materia===m);
